@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dance Coach — prototype</title>
+<style>
+  :root{
+    --bg:#0d0b14; --panel:#17141f; --line:#2a2536; --text:#f4f1ea; --muted:#9a94a8;
+    --good:#c6ff3d; --mid:#ffb020; --bad:#ff5a4d; --hot:#ff4d8d;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{min-height:100vh;display:flex;flex-direction:column}
+  header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+  h1{font-size:18px;margin:0;letter-spacing:.02em;font-weight:800}
+  h1 span{color:var(--hot)}
+  .group{display:flex;align-items:center;gap:8px}
+  .group label{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+  .seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px}
+  .seg button{background:none;border:0;color:var(--muted);font:inherit;font-size:13px;font-weight:600;
+    padding:7px 13px;border-radius:999px;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:var(--text);color:var(--bg)}
+  .seg button:focus-visible,.btn:focus-visible{outline:2px solid var(--good);outline-offset:2px}
+  main{flex:1;display:grid;grid-template-columns:1fr 1.25fr;gap:14px;padding:14px 18px;min-height:0}
+  .stage{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;min-height:300px}
+  .tag{position:absolute;top:12px;left:14px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);z-index:2}
+  #ref{width:100%;height:100%;display:block;position:absolute;inset:0}
+  .count{position:absolute;right:16px;top:6px;font-size:84px;font-weight:900;line-height:1;color:var(--hot);
+    font-variant-numeric:tabular-nums;z-index:2}
+  .count.pop{animation:pop .18s ease-out}
+  @keyframes pop{from{transform:scale(1.25)}to{transform:scale(1)}}
+  .cue{position:absolute;left:0;right:0;bottom:14px;text-align:center;font-size:22px;font-weight:800;z-index:2}
+  #you{width:100%;height:auto;max-height:100%;display:block;object-fit:contain}
+  .score{position:absolute;right:16px;top:8px;text-align:right;z-index:2;text-shadow:0 2px 12px #000}
+  .score b{display:block;font-size:76px;line-height:1;font-weight:900;font-variant-numeric:tabular-nums}
+  .score small{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text);opacity:.8}
+  .hint{position:absolute;left:0;right:0;bottom:14px;text-align:center;font-size:18px;font-weight:700;z-index:2;
+    text-shadow:0 2px 10px #000;padding:0 12px}
+  .gate{position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;
+    text-align:center;padding:24px;background:var(--panel);z-index:3}
+  .gate p{margin:0;color:var(--muted);max-width:34ch;line-height:1.45;font-size:14px}
+  .btn{background:var(--good);color:#10130a;border:0;border-radius:999px;font:inherit;font-weight:800;font-size:16px;
+    padding:13px 26px;cursor:pointer}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.ghost{background:none;color:var(--text);border:1px solid var(--line)}
+  footer{padding:0 18px 18px;display:flex;flex-direction:column;gap:14px;align-items:center}
+  .results{width:100%;max-width:760px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px 20px}
+  .results h2{margin:0 0 4px;font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .results .big{font-size:44px;font-weight:900;margin:0 0 8px}
+  .results ul{margin:0;padding-left:18px;line-height:1.6}
+  .bars{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0 4px}
+  .bar{font-size:12px;color:var(--muted)}
+  .bar i{display:block;height:8px;border-radius:99px;background:var(--line);margin-top:6px;overflow:hidden}
+  .bar i::after{content:"";display:block;height:100%;width:var(--v);background:var(--c)}
+  .bar b{color:var(--text);float:right}
+  [hidden]{display:none!important}
+  @media (max-width:820px){
+    main{grid-template-columns:1fr;grid-template-rows:34vh auto}
+    .count{font-size:60px}.score b{font-size:56px}.cue{font-size:18px}
+    .stage{min-height:0}
+    #youStage{min-height:44vh}
+  }
+  @media (prefers-reduced-motion:reduce){.count.pop{animation:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Dance<span>Coach</span></h1>
+  <div class="group"><label id="lm">Move</label><div class="seg" id="moves" role="group" aria-labelledby="lm"></div></div>
+  <div class="group"><label id="lt">Tempo</label>
+    <div class="seg" id="tempo" role="group" aria-labelledby="lt">
+      <button data-bpm="45" aria-pressed="true">Slow</button>
+      <button data-bpm="70" aria-pressed="false">Medium</button>
+      <button data-bpm="95" aria-pressed="false">Full</button>
+    </div>
+  </div>
+  <div class="group"><div class="seg"><button id="sound" aria-pressed="true">Beat on</button></div></div>
+</header>
+
+<main>
+  <section class="stage" aria-label="Reference dancer">
+    <div class="tag">Copy this — like a mirror</div>
+    <canvas id="ref"></canvas>
+    <div class="count" id="count" aria-hidden="true">1</div>
+    <div class="cue" id="cue" aria-live="off"></div>
+  </section>
+  <section class="stage" id="youStage" aria-label="Your camera">
+    <div class="tag">You</div>
+    <canvas id="you" width="640" height="480"></canvas>
+    <div class="score" id="scoreBox" hidden><b id="score">–</b><small>match</small></div>
+    <div class="hint" id="hint" aria-live="polite"></div>
+    <div class="gate" id="gate">
+      <button class="btn" id="camBtn">Turn on camera</button>
+      <p id="gateMsg">Stand back so your whole body fits in the frame. Video never leaves your device.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <button class="btn" id="startBtn" disabled>Start a round</button>
+  <div class="results" id="results" hidden></div>
+</footer>
+<video id="video" playsinline muted hidden></video>
+
+<script type="module">
+/*<core>*/
+const D = Math.PI / 180;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+// Body segments we score. a/b are MediaPipe pose landmark indices.
+const SEGS = [
+  { k: 'lUpper', a: 11, b: 13, part: 0 }, { k: 'lFore', a: 13, b: 15, part: 0 },
+  { k: 'rUpper', a: 12, b: 14, part: 1 }, { k: 'rFore', a: 14, b: 16, part: 1 },
+  { k: 'lThigh', a: 23, b: 25, part: 2 }, { k: 'lShin', a: 25, b: 27, part: 2 },
+  { k: 'rThigh', a: 24, b: 26, part: 3 }, { k: 'rShin', a: 26, b: 28, part: 3 },
+];
+const PARTS = ['left arm', 'right arm', 'left leg', 'right leg'];
+
+// A pose is one angle per segment, in degrees on screen: 0 = straight down,
+// -90 = toward screen-left, +90 = toward screen-right, ±180 = straight up.
+// "l" limbs are drawn on screen-left, so the dancer is your mirror image.
+const REST = { lUpper: -12, lFore: -8, rUpper: 12, rFore: 8, lThigh: -4, lShin: 0, rThigh: 4, rShin: 0 };
+const P = o => ({ ...REST, ...o });
+const T = { lUpper: -90, lFore: -90, rUpper: 90, rFore: 90 };
+const UP = { lUpper: -160, lFore: -170, rUpper: 160, rFore: 170 };
+const PLIE = { lThigh: -28, lShin: 12, rThigh: 28, rShin: -12 };
+const L_HIP = { lUpper: -45, lFore: 35 }, R_HIP = { rUpper: 45, rFore: -35 };
+
+const MOVES = [
+  { name: 'Reach & Open', keys: [
+    { cue: 'Arms out', pose: P(T) },
+    { cue: 'Reach up', pose: P(UP) },
+    { cue: 'Arms out', pose: P(T) },
+    { cue: 'Drop', pose: P({}) },
+    { cue: 'Left up', pose: P({ lUpper: -160, lFore: -170, rUpper: 90, rFore: 90 }) },
+    { cue: 'Right up', pose: P({ lUpper: -90, lFore: -90, rUpper: 160, rFore: 170 }) },
+    { cue: 'Goalposts', pose: P({ lUpper: -90, lFore: -180, rUpper: 90, rFore: 180 }) },
+    { cue: 'Drop', pose: P({}) },
+  ]},
+  { name: 'Point & Sweep', keys: [
+    { cue: 'Point high', pose: P({ ...L_HIP, rUpper: 140, rFore: 140 }) },
+    { cue: 'Sweep low', pose: P({ ...L_HIP, rUpper: -25, rFore: -50 }) },
+    { cue: 'Point high', pose: P({ ...L_HIP, rUpper: 140, rFore: 140 }) },
+    { cue: 'Sweep low', pose: P({ ...L_HIP, rUpper: -25, rFore: -50 }) },
+    { cue: 'Switch — point high', pose: P({ ...R_HIP, lUpper: -140, lFore: -140 }) },
+    { cue: 'Sweep low', pose: P({ ...R_HIP, lUpper: 25, lFore: 50 }) },
+    { cue: 'Point high', pose: P({ ...R_HIP, lUpper: -140, lFore: -140 }) },
+    { cue: 'Sweep low', pose: P({ ...R_HIP, lUpper: 25, lFore: 50 }) },
+  ]},
+  { name: 'Bounce & Kick', keys: [
+    { cue: 'Bend, arms out', pose: P({ ...PLIE, ...T }) },
+    { cue: 'Up!', pose: P(UP) },
+    { cue: 'Bend, arms out', pose: P({ ...PLIE, ...T }) },
+    { cue: 'Down', pose: P({}) },
+    { cue: 'Left leg out', pose: P({ lThigh: -40, lShin: -40, lUpper: -90, lFore: -90, rUpper: 160, rFore: 170 }) },
+    { cue: 'Together', pose: P({}) },
+    { cue: 'Right leg out', pose: P({ rThigh: 40, rShin: 40, rUpper: 90, rFore: 90, lUpper: -160, lFore: -170 }) },
+    { cue: 'Together', pose: P({}) },
+  ]},
+];
+
+const HOLD = 0.3; // fraction of each beat the pose is held before moving on
+const smooth = x => x * x * (3 - 2 * x);
+function lerpPose(a, b, p) {
+  const o = {};
+  for (const k in a) o[k] = a[k] + (b[k] - a[k]) * p;
+  return o;
+}
+// The pose for count n is hit exactly on beat n-1, held briefly, then eased to the next.
+function poseAt(move, beat) {
+  const K = move.keys, n = K.length;
+  if (beat < 0) return lerpPose(REST, K[0].pose, smooth(clamp(beat + 1, 0, 1)));
+  const fl = Math.floor(beat), i = fl % n, f = beat - fl;
+  const p = f < HOLD ? 0 : smooth((f - HOLD) / (1 - HOLD));
+  return lerpPose(K[i].pose, K[(i + 1) % n].pose, p);
+}
+
+// Stick figure for a pose, as points keyed by landmark index (plus head).
+function buildFigure(pose, W, H) {
+  const u = H / 10.5, cx = W / 2, ground = H * 0.93;
+  const thigh = 1.9 * u, shin = 1.9 * u, upper = 1.35 * u, fore = 1.3 * u, torso = 2.4 * u, sw = 0.95 * u, hw = 0.55 * u;
+  const step = (p, a, len) => [p[0] + Math.sin(a * D) * len, p[1] + Math.cos(a * D) * len];
+  const legV = (t, s) => thigh * Math.cos(t * D) + shin * Math.cos(s * D);
+  const hipY = ground - Math.max(legV(pose.lThigh, pose.lShin), legV(pose.rThigh, pose.rShin));
+  const shY = hipY - torso;
+  const pts = { 11: [cx - sw, shY], 12: [cx + sw, shY], 23: [cx - hw, hipY], 24: [cx + hw, hipY] };
+  pts[13] = step(pts[11], pose.lUpper, upper); pts[15] = step(pts[13], pose.lFore, fore);
+  pts[14] = step(pts[12], pose.rUpper, upper); pts[16] = step(pts[14], pose.rFore, fore);
+  pts[25] = step(pts[23], pose.lThigh, thigh); pts[27] = step(pts[25], pose.lShin, shin);
+  pts[26] = step(pts[24], pose.rThigh, thigh); pts[28] = step(pts[26], pose.rShin, shin);
+  pts.head = [cx, shY - 0.95 * u]; pts.headR = 0.55 * u;
+  return pts;
+}
+
+// Mirrored limb direction vectors (in pixels) from raw camera landmarks.
+function userVectors(lm, w, h) {
+  return SEGS.map(s => {
+    const a = lm[s.a], b = lm[s.b];
+    if (!a || !b) return null;
+    if ((a.visibility ?? 1) < 0.5 || (b.visibility ?? 1) < 0.5) return null;
+    return [-(b.x - a.x) * w, (b.y - a.y) * h];
+  });
+}
+// 0..1 for one limb: full marks within 12 degrees, zero at 55 degrees off.
+function segScore(v, angleDeg) {
+  const rx = Math.sin(angleDeg * D), ry = Math.cos(angleDeg * D);
+  const len = Math.hypot(v[0], v[1]);
+  const d = Math.acos(clamp((v[0] * rx + v[1] * ry) / len, -1, 1)) / D;
+  return clamp(1 - (d - 12) / 43, 0, 1);
+}
+// Limbs the move is actually using right now count for more, so standing still
+// can't coast on limbs that are simply hanging at rest.
+function scoreAgainst(vecs, pose, minLen) {
+  const segs = [], ps = [0, 0, 0, 0], pw = [0, 0, 0, 0];
+  let sum = 0, wsum = 0, n = 0;
+  SEGS.forEach((s, i) => {
+    const v = vecs[i];
+    // Skip limbs we can't see, or that point at the camera (too short on screen to read an angle).
+    if (!v || Math.hypot(v[0], v[1]) < minLen) { segs.push(null); return; }
+    const sc = segScore(v, pose[s.k]), w = 0.06 + Math.min(1, Math.abs(pose[s.k] - REST[s.k]) / 30);
+    segs.push(sc); sum += sc * w; wsum += w; n++; ps[s.part] += sc * w; pw[s.part] += w;
+  });
+  return { overall: n ? sum / wsum : 0, n, segs, parts: ps.map((x, i) => pw[i] ? x / pw[i] : null) };
+}
+// Timing tolerance: people trail the beat, so try the reference a little earlier
+// (and a touch later) and keep the best match rather than punishing lateness.
+const LAGS = [-0.08, 0, 0.1, 0.2, 0.3];
+function scoreFrame(vecs, move, beat, bpm, minLen) {
+  let best = null;
+  for (const lag of LAGS) {
+    const r = scoreAgainst(vecs, poseAt(move, beat - lag * bpm / 60), minLen);
+    if (r.n && (!best || r.overall > best.overall)) best = r;
+  }
+  return best;
+}
+/*</core>*/
+
+// ---------- App ----------
+const $ = id => document.getElementById(id);
+const video = $('video'), you = $('you'), yctx = you.getContext('2d'), ref = $('ref'), rctx = ref.getContext('2d');
+const css = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+const C = { good: css('--good'), mid: css('--mid'), bad: css('--bad'), hot: css('--hot'), text: css('--text'), muted: css('--muted') };
+const colour = s => s == null ? C.muted : s >= 0.75 ? C.good : s >= 0.45 ? C.mid : C.bad;
+
+let move = MOVES[0], bpm = 45, t0 = performance.now(), lastBeat = null;
+let landmarker = null, lm = null, lastVT = -1, live = null, shown = 0, partEma = [null, null, null, null];
+let round = null, audio = null, soundOn = true;
+const LOOPS = 4, LEAD = 4;
+
+// Controls
+MOVES.forEach((m, i) => {
+  const b = document.createElement('button');
+  b.textContent = m.name; b.setAttribute('aria-pressed', i === 0);
+  b.onclick = () => { move = m; press($('moves'), b); cancelRound(); };
+  $('moves').append(b);
+});
+function press(group, btn) { group.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === btn)); }
+$('tempo').querySelectorAll('button').forEach(b => b.onclick = () => {
+  const now = performance.now(), beat = (now - t0) / 60000 * bpm;
+  bpm = +b.dataset.bpm; t0 = now - beat * 60000 / bpm; // keep the beat position continuous
+  press($('tempo'), b); cancelRound();
+});
+$('sound').onclick = e => {
+  soundOn = !soundOn; e.target.setAttribute('aria-pressed', soundOn); e.target.textContent = soundOn ? 'Beat on' : 'Beat off';
+  if (soundOn) ensureAudio();
+};
+function ensureAudio() {
+  try { audio ??= new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch { audio = null; }
+}
+function tick(accent) {
+  if (!soundOn || !audio || audio.state !== 'running') return;
+  const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime;
+  o.frequency.value = accent ? 1320 : 880; g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+  o.connect(g).connect(audio.destination); o.start(t); o.stop(t + 0.09);
+}
+
+// Camera + pose model
+$('camBtn').onclick = async () => {
+  const btn = $('camBtn'), msg = $('gateMsg');
+  ensureAudio();
+  if (!navigator.mediaDevices?.getUserMedia) { msg.textContent = 'This browser can\'t open the camera here. Open the page over https or on localhost.'; return; }
+  btn.disabled = true;
+  try {
+    msg.textContent = 'Asking for the camera…';
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 720 } }, audio: false });
+    video.srcObject = stream; await video.play();
+    you.width = video.videoWidth; you.height = video.videoHeight;
+    msg.textContent = 'Loading the pose model (a few MB, first time only)…';
+    const V = '0.10.14';
+    const { PoseLandmarker, FilesetResolver } = await import(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${V}/vision_bundle.mjs`);
+    const fileset = await FilesetResolver.forVisionTasks(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${V}/wasm`);
+    const model = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+    const make = delegate => PoseLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: model, delegate }, runningMode: 'VIDEO', numPoses: 1 });
+    try { landmarker = await make('GPU'); } catch { landmarker = await make('CPU'); }
+    $('gate').hidden = true; $('scoreBox').hidden = false; $('startBtn').disabled = false;
+  } catch (err) {
+    btn.disabled = false;
+    msg.textContent = err?.name === 'NotAllowedError' ? 'Camera permission was blocked. Allow it in the browser\'s site settings and try again.'
+      : 'Couldn\'t start: ' + (err?.message || err);
+  }
+};
+
+// Rounds
+$('startBtn').onclick = () => {
+  ensureAudio();
+  if (round) { cancelRound(); return; }
+  t0 = performance.now() + LEAD * 60000 / bpm; lastBeat = null;
+  round = { sum: 0, n: 0, parts: PARTS.map(() => [0, 0]), counts: move.keys.map(() => [0, 0]), frames: 0, legFrames: 0 };
+  $('results').hidden = true; $('startBtn').textContent = 'Stop'; $('startBtn').classList.add('ghost');
+};
+function cancelRound() { if (round) { round = null; resetStart(); } }
+function resetStart() { $('startBtn').textContent = 'Start a round'; $('startBtn').classList.remove('ghost'); }
+
+function finishRound() {
+  const r = round; round = null; resetStart();
+  const el = $('results'); el.hidden = false;
+  if (r.n < 20) {
+    el.innerHTML = '<h2>Round result</h2><p>I couldn\'t see you for most of that round. Step back until your whole body is in the frame, with light in front of you rather than behind.</p>';
+    return;
+  }
+  const pct = x => Math.round(x * 100), overall = r.sum / r.n;
+  const parts = r.parts.map(([s, n], i) => ({ name: PARTS[i], v: n > 10 ? s / n : null })).filter(p => p.v != null);
+  const best = [...parts].sort((a, b) => b.v - a.v)[0], worst = [...parts].sort((a, b) => a.v - b.v)[0];
+  const counts = r.counts.map(([s, n], i) => ({ i, v: n ? s / n : null })).filter(c => c.v != null);
+  const hard = [...counts].sort((a, b) => a.v - b.v)[0];
+  const verdict = overall >= 0.85 ? 'You\'ve got it.' : overall >= 0.65 ? 'Nearly there.' : overall >= 0.4 ? 'Getting the shape.' : 'Early days — slow it down.';
+  const tips = [];
+  if (best && worst && best !== worst) {
+    tips.push(`Strongest: your ${best.name} (${pct(best.v)}%).`);
+    if (worst.v < 0.8) tips.push(`Work on: your ${worst.name} (${pct(worst.v)}%). Watch that limb on the dancer and copy its angle exactly.`);
+  }
+  if (hard && hard.v < 0.8) tips.push(`Toughest count: ${hard.i + 1}, “${move.keys[hard.i].cue}” (${pct(hard.v)}%).`);
+  if (r.legFrames < r.frames * 0.5) tips.push('I couldn\'t see your legs most of the time, so they weren\'t scored. Step back to get your feet in the frame.');
+  if (overall >= 0.85 && bpm < 95) tips.push('Bump the tempo up a notch.');
+  el.innerHTML = `<h2>Round result — ${move.name}</h2><p class="big" style="color:${colour(overall)}">${pct(overall)}% <span style="font-size:20px;color:var(--text)">${verdict}</span></p>
+    <div class="bars">${parts.map(p => `<div class="bar">${p.name}<b>${pct(p.v)}%</b><i style="--v:${pct(p.v)}%;--c:${colour(p.v)}"></i></div>`).join('')}</div>
+    <ul>${tips.map(t => `<li>${t}</li>`).join('')}</ul>`;
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Drawing
+function line(ctx, a, b, col, w) { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+function drawRef(pose) {
+  const dpr = window.devicePixelRatio || 1, W = ref.clientWidth, H = ref.clientHeight;
+  if (ref.width !== Math.round(W * dpr) || ref.height !== Math.round(H * dpr)) { ref.width = Math.round(W * dpr); ref.height = Math.round(H * dpr); }
+  rctx.setTransform(dpr, 0, 0, dpr, 0, 0); rctx.clearRect(0, 0, W, H); rctx.lineCap = 'round';
+  const p = buildFigure(pose, W, H), w = Math.max(5, H / 38);
+  line(rctx, [W * 0.2, H * 0.93 + w], [W * 0.8, H * 0.93 + w], '#2a2536', 2);
+  line(rctx, p[11], p[12], C.text, w); line(rctx, p[23], p[24], C.text, w);
+  line(rctx, p[11], p[23], C.text, w); line(rctx, p[12], p[24], C.text, w);
+  SEGS.forEach(s => line(rctx, p[s.a], p[s.b], s.part < 2 ? C.hot : C.good, w));
+  rctx.fillStyle = C.text; rctx.beginPath(); rctx.arc(p.head[0], p.head[1], p.headR, 0, 7); rctx.fill();
+}
+function drawYou() {
+  const W = you.width, H = you.height;
+  yctx.save(); yctx.scale(-1, 1); yctx.drawImage(video, -W, 0, W, H); yctx.restore();
+  yctx.fillStyle = 'rgba(13,11,20,.35)'; yctx.fillRect(0, 0, W, H);
+  if (!lm) return;
+  const pt = i => [(1 - lm[i].x) * W, lm[i].y * H], w = Math.max(4, W / 110);
+  yctx.lineCap = 'round';
+  [[11, 12], [23, 24], [11, 23], [12, 24]].forEach(([a, b]) => line(yctx, pt(a), pt(b), 'rgba(244,241,234,.85)', w));
+  SEGS.forEach((s, i) => {
+    if ((lm[s.a].visibility ?? 1) < 0.5 || (lm[s.b].visibility ?? 1) < 0.5) return;
+    line(yctx, pt(s.a), pt(s.b), colour(live ? live.segs[i] : null), w * 1.5);
+  });
+}
+
+function onBeat(bi) {
+  const n = move.keys.length, c = $('count');
+  if (bi < 0) { c.textContent = round ? 9 + bi : ''; $('cue').textContent = round ? 'Get ready' : ''; tick(false); }
+  else { const i = bi % n; c.textContent = i + 1; $('cue').textContent = move.keys[i].cue; tick(i === 0); }
+  c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop');
+}
+
+function frame(now) {
+  const beat = (now - t0) / 60000 * bpm, bi = Math.floor(beat);
+  if (bi !== lastBeat) { lastBeat = bi; onBeat(bi); }
+  drawRef(poseAt(move, beat));
+
+  if (landmarker && video.readyState >= 2) {
+    let fresh = false;
+    if (video.currentTime !== lastVT) {
+      lastVT = video.currentTime; fresh = true;
+      try { lm = landmarker.detectForVideo(video, now).landmarks[0] || null; } catch { lm = null; }
+      if (lm) {
+        const W = you.width, H = you.height;
+        const torso = Math.hypot((lm[11].x - lm[23].x) * W, (lm[11].y - lm[23].y) * H);
+        live = scoreFrame(userVectors(lm, W, H), move, beat, bpm, torso * 0.25);
+      } else live = null;
+    }
+    drawYou();
+    if (fresh) {
+      if (live) {
+        shown += (live.overall - shown) * 0.25;
+        live.parts.forEach((v, i) => { if (v != null) partEma[i] = partEma[i] == null ? v : partEma[i] + (v - partEma[i]) * 0.1; });
+        $('score').textContent = Math.round(shown * 100); $('score').style.color = colour(shown);
+        let wi = -1; partEma.forEach((v, i) => { if (live.parts[i] != null && v != null && (wi < 0 || v < partEma[wi])) wi = i; });
+        $('hint').textContent = live.parts[2] == null && live.parts[3] == null ? 'Step back — I can\'t see your legs'
+          : wi >= 0 && partEma[wi] < 0.45 ? `Watch your ${PARTS[wi]}` : shown >= 0.8 ? 'That\'s it — keep going' : '';
+        if (round && beat >= 0) {
+          const ci = Math.floor(Math.max(0, beat - 0.15 * bpm / 60)) % move.keys.length;
+          round.sum += live.overall; round.n++; round.frames++;
+          round.counts[ci][0] += live.overall; round.counts[ci][1]++;
+          live.parts.forEach((v, i) => { if (v != null) { round.parts[i][0] += v; round.parts[i][1]++; } });
+          if (live.parts[2] != null || live.parts[3] != null) round.legFrames++;
+        }
+      } else {
+        $('score').textContent = '–'; $('score').style.color = ''; $('hint').textContent = 'Step into the frame';
+        if (round && beat >= 0) round.frames++;
+      }
+    }
+  }
+  if (round && beat >= LOOPS * move.keys.length) finishRound();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
